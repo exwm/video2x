@@ -11,7 +11,6 @@ permissions:
 jobs:
   setup:
     name: Setup
-    if: github.event.base_ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -70,7 +69,6 @@ jobs:
 
   windows:
     # Disabled because it takes too long to build
-    if: false
     name: Build Windows release
     needs:
       - setup
@@ -122,35 +120,17 @@ jobs:
           name: video2x-windows-amd64
           path: build/video2x-windows-amd64.zip
 
-  container:
-    name: Build and upload container
-    needs:
-      - setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - uses: mr-smithers-excellent/docker-build-push@v6
-        name: Build & push the Docker image
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USER }}
-          password: ${{ secrets.GHCR_TOKEN }}
-          dockerfile: packaging/docker/Dockerfile
-          image: video2x
-          tags: latest, ${{ needs.setup.outputs.version }}
 
   create-release:
     name: Create release
     needs:
       - setup
       # - ubuntu-2404
-      # - windows
-      - container
+      - windows
+      # - container
     runs-on: ubuntu-latest
     # outputs:
-    #   upload_url: ${{ steps.create_release.outputs.upload_url }}
+      # upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       # - name: Download artifacts
       #   uses: actions/download-artifact@v7
