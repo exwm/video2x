@@ -76,8 +76,33 @@ class LIBVIDEO2X_API VideoProcessor {
         std::unique_ptr<processors::Processor>& processor,
         encoder::Encoder& encoder,
         std::unique_ptr<AVFrame, decltype(&avutils::av_frame_deleter)>& prev_frame,
-        AVFrame* frame,
-        AVFrame* proc_frame
+        AVFrame* frame
+    );
+
+    [[nodiscard]] int interpolate_and_write(
+        processors::Interpolator* interpolator,
+        encoder::Encoder& encoder,
+        AVFrame* prev_frame,
+        AVFrame* curr_frame,
+        bool skip_frame,
+        float ts,
+        int64_t out_pts  // AV_NOPTS_VALUE = let encoder assign PTS (CFR mode)
+    );
+
+    [[nodiscard]] int interpolate_min_fps_gap(
+        processors::Interpolator* interpolator,
+        encoder::Encoder& encoder,
+        AVFrame* prev_frame,
+        AVFrame* curr_frame,
+        bool skip_frame
+    );
+
+    [[nodiscard]] int interpolate_proportional_gap(
+        processors::Interpolator* interpolator,
+        encoder::Encoder& encoder,
+        AVFrame* prev_frame,
+        AVFrame* curr_frame,
+        bool skip_frame
     );
 
     processors::ProcessorConfig proc_cfg_;
@@ -85,6 +110,13 @@ class LIBVIDEO2X_API VideoProcessor {
     uint32_t vk_device_idx_ = 0;
     AVHWDeviceType hw_device_type_ = AV_HWDEVICE_TYPE_NONE;
     bool benchmark_ = false;
+
+    bool vfr_proportional_ = false;
+    bool vfr_min_fps_ = false;
+    AVRational in_time_base_ = {0, 1};
+    int64_t avg_frame_duration_ = 0;  // average input frame duration in in_time_base_ units
+    int64_t vfr_frame_interval_ = 0;  // target output frame interval in in_time_base_ units
+    int64_t vfr_next_pts_ = AV_NOPTS_VALUE;  // next scheduled output PTS
 
     std::atomic<VideoProcessorState> state_ = VideoProcessorState::Idle;
     std::atomic<int64_t> frame_idx_ = 0;

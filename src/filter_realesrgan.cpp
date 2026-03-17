@@ -1,7 +1,6 @@
 #include "filter_realesrgan.h"
 
 #include <cstdint>
-#include <cstdio>
 #include <filesystem>
 
 #include <libavutil/pixdesc.h>

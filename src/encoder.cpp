@@ -1,5 +1,7 @@
 #include "encoder.h"
 
+#include <climits>
+
 #include <spdlog/spdlog.h>
 
 extern "C" {
@@ -28,6 +30,35 @@ Encoder::~Encoder() {
     }
     if (stream_map_) {
         av_free(stream_map_);
+    }
+}
+
+void Encoder::configure_vfr_time_base(int frm_rate_mul, AVCodecContext* dec_ctx) {
+    // VFR modes never carry a fixed frame rate
+    enc_ctx_->framerate = {0, 1};
+
+    if (frm_rate_mul > 0) {
+        // Proportional mode: use a finer time base so interpolated positions within
+        // each input gap can be represented exactly.
+        AVRational in_tb = dec_ctx->time_base;
+        if (in_tb.den <= INT_MAX / frm_rate_mul) {
+            enc_ctx_->time_base = {in_tb.num, in_tb.den * frm_rate_mul};
+        } else {
+            logger()->warn(
+                "Time base denominator overflow ({}*{}); falling back to 1/{}",
+                in_tb.den,
+                frm_rate_mul,
+                90000 * frm_rate_mul
+            );
+            enc_ctx_->time_base = {1, 90000 * frm_rate_mul};
+        }
+    } else {
+        // Min-fps mode: output frame rate is variable; use input time base directly.
+        if (dec_ctx->time_base.num > 0 && dec_ctx->time_base.den > 0) {
+            enc_ctx_->time_base = dec_ctx->time_base;
+        } else {
+            enc_ctx_->time_base = {1, 90000};
+        }
     }
 }
 
@@ -129,19 +160,21 @@ int Encoder::init(
         logger()->debug("Auto-selected pixel format: {}", av_get_pix_fmt_name(enc_ctx_->pix_fmt));
     }
 
-    if (frm_rate_mul > 0) {
+    if (enc_cfg.vfr) {
+        configure_vfr_time_base(frm_rate_mul, dec_ctx);
+    } else if (frm_rate_mul > 0) {
+        // CFR: existing behavior, unchanged
         AVRational in_frame_rate = avutils::get_video_frame_rate(ifmt_ctx, in_vstream_idx);
         enc_ctx_->framerate = {in_frame_rate.num * frm_rate_mul, in_frame_rate.den};
         enc_ctx_->time_base = av_inv_q(enc_ctx_->framerate);
     } else {
-        // Set the output video's time base
+        // Filter/passthrough mode: copy time base and frame rate from decoder
         if (dec_ctx->time_base.num > 0 && dec_ctx->time_base.den > 0) {
             enc_ctx_->time_base = dec_ctx->time_base;
         } else {
             enc_ctx_->time_base = av_inv_q(av_guess_frame_rate(ifmt_ctx, out_vstream, nullptr));
         }
 
-        // Set the output video's frame rate
         if (dec_ctx->framerate.num > 0 && dec_ctx->framerate.den > 0) {
             enc_ctx_->framerate = dec_ctx->framerate;
         } else {

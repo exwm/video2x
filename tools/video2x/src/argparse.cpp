@@ -147,6 +147,14 @@ int parse_args(
             ("scene-thresh,t", po::value<float>(&proc_cfg.scn_det_thresh)->default_value(100.0f)
                 ->notifier([](float v) { validate_range<float>(v, "scene-thresh", 0.0, 100.0); }),
                 "Scene detection threshold (20 means 20% diff between frames is a scene change)")
+            ("vfr", po::bool_switch(&proc_cfg.vfr),
+                "Enable variable frame rate mode: place interpolated frames at timestamps "
+                "proportional to the actual input PTS gap rather than assuming a fixed frame "
+                "duration; requires --frame-rate-mul")
+            ("vfr-min-fps", po::value<float>(),
+                "Enable VFR fill mode: emit frames only at exact grid positions aligned to this "
+                "minimum output fps; slow-motion sections get more frames, fast sections are "
+                "untouched; mutually exclusive with --vfr and --frame-rate-mul")
         ;
 
         po::options_description libplacebo_opts("libplacebo options");
@@ -242,6 +250,30 @@ int parse_args(
 
         // Run all notify functions and validations
         po::notify(vm);
+
+        if (proc_cfg.vfr && proc_cfg.frm_rate_mul < 2) {
+            video2x::logger()->critical("--vfr requires --frame-rate-mul to be set.");
+            return -1;
+        }
+
+        if (vm.count("vfr-min-fps")) {
+            if (proc_cfg.vfr) {
+                video2x::logger()->critical("--vfr-min-fps and --vfr are mutually exclusive.");
+                return -1;
+            }
+            if (proc_cfg.frm_rate_mul >= 2) {
+                video2x::logger()->critical(
+                    "--vfr-min-fps and --frame-rate-mul are mutually exclusive."
+                );
+                return -1;
+            }
+            float fps_f = vm["vfr-min-fps"].as<float>();
+            if (fps_f <= 0.0f) {
+                video2x::logger()->critical("--vfr-min-fps must be a positive value.");
+                return -1;
+            }
+            proc_cfg.vfr_fps = av_d2q(static_cast<double>(fps_f), 100000);
+        }
 
         if (vm.count("log-level")) {
             if (!video2x::logger_manager::LoggerManager::instance().set_log_level(
@@ -458,13 +490,12 @@ int parse_args(
                     video2x::logger()->critical("The model name must be set for RIFE.");
                     return -1;
                 }
-                if (proc_cfg.frm_rate_mul < 2) {
+                if (proc_cfg.frm_rate_mul < 2 && proc_cfg.vfr_fps.num <= 0) {
                     video2x::logger()->critical(
-                        "Frame rate multiplier must be set to at least 2 for RIFE."
+                        "RIFE requires either --frame-rate-mul (>=2) or --vfr-min-fps."
                     );
                     return -1;
                 }
-
                 proc_cfg.processor_type = video2x::processors::ProcessorType::RIFE;
                 video2x::processors::RIFEConfig rife_config;
                 rife_config.tta_mode = false;

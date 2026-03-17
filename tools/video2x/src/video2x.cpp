@@ -168,18 +168,9 @@ int main(int argc, char** argv) {
                 auto [hours_elapsed, minutes_elapsed, seconds_elapsed] =
                     calculate_time_components(time_elapsed);
 
-                // Calculate estimated time remaining
-                int64_t frames_remaining = total_frames - processed_frames;
                 double processing_rate = time_elapsed > 0
                     ? static_cast<double>(processed_frames) / time_elapsed
                     : 0.0;
-                int time_remaining =
-                    static_cast<int>(static_cast<double>(frames_remaining) / processing_rate);
-                time_remaining = std::max<int>(time_remaining, 0);
-
-                // Calculate hours, minutes, and seconds remaining
-                auto [hours_remaining, minutes_remaining, seconds_remaining] =
-                    calculate_time_components(time_remaining);
 
                 // Print the progress bar
                 std::cout << "\r\033[Kframe=" << processed_frames << "/" << total_frames << " ("
@@ -187,10 +178,26 @@ int main(int argc, char** argv) {
                           << "%); fps=" << std::fixed << std::setprecision(2) << processing_rate
                           << "; elapsed=" << std::setw(2) << std::setfill('0') << hours_elapsed
                           << ":" << std::setw(2) << std::setfill('0') << minutes_elapsed << ":"
-                          << std::setw(2) << std::setfill('0') << seconds_elapsed
-                          << "; remaining=" << std::setw(2) << std::setfill('0') << hours_remaining
-                          << ":" << std::setw(2) << std::setfill('0') << minutes_remaining << ":"
-                          << std::setw(2) << std::setfill('0') << seconds_remaining;
+                          << std::setw(2) << std::setfill('0') << seconds_elapsed;
+
+                // Only show ETA when total frames is known
+                if (total_frames > 0) {
+                    int64_t frames_remaining = total_frames - processed_frames;
+                    int time_remaining = processing_rate > 0
+                        ? static_cast<int>(
+                              static_cast<double>(frames_remaining) / processing_rate
+                          )
+                        : 0;
+                    time_remaining = std::max<int>(time_remaining, 0);
+                    auto [hours_remaining, minutes_remaining, seconds_remaining] =
+                        calculate_time_components(time_remaining);
+                    std::cout << "; remaining=" << std::setw(2) << std::setfill('0')
+                              << hours_remaining << ":" << std::setw(2) << std::setfill('0')
+                              << minutes_remaining << ":" << std::setw(2) << std::setfill('0')
+                              << seconds_remaining;
+                } else {
+                    std::cout << "; remaining=?";
+                }
                 std::cout.flush();
                 logger_sink->set_needs_newline(true);
             }

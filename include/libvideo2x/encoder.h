@@ -18,6 +18,7 @@ struct EncoderConfig {
     // Non-AVCodecContext options
     std::string codec = "libx264";
     bool recalculate_pts = true;
+    bool vfr = false;
     bool copy_audio_streams = true;
     bool copy_subtitle_streams = true;
 
@@ -74,6 +75,8 @@ class Encoder {
     int get_output_video_stream_index() const;
 
    private:
+    void configure_vfr_time_base(int frm_rate_mul, AVCodecContext* dec_ctx);
+
     EncoderConfig enc_cfg_;
     AVFormatContext* ofmt_ctx_;
     AVCodecContext* enc_ctx_;

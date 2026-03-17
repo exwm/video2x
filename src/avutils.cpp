@@ -15,6 +15,14 @@ extern "C" {
 namespace video2x {
 namespace avutils {
 
+int64_t resolve_pts(const AVFrame* frame) {
+    if (frame->best_effort_timestamp != AV_NOPTS_VALUE)
+        return frame->best_effort_timestamp;
+    if (frame->pts != AV_NOPTS_VALUE)
+        return frame->pts;
+    return AV_NOPTS_VALUE;
+}
+
 AVRational get_video_frame_rate(AVFormatContext* ifmt_ctx, int in_vstream_idx) {
     AVRational frame_rate = ifmt_ctx->streams[in_vstream_idx]->avg_frame_rate;
     if (frame_rate.num == 0 && frame_rate.den == 0) {

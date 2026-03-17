@@ -78,3 +78,6 @@ CMakeUserPresets.json
 
 third_party/
 build/
+
+ffmpeg-shared.zip
+ncnn-shared.zip

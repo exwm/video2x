@@ -62,6 +62,8 @@ struct ProcessorConfig {
     int noise_level = -1;
     int frm_rate_mul = 0;
     float scn_det_thresh = 0.0f;
+    bool vfr = false;
+    AVRational vfr_fps = {0, 1};
     std::variant<LibplaceboConfig, RealESRGANConfig, RealCUGANConfig, RIFEConfig> config;
 };
 

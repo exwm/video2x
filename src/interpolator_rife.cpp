@@ -1,6 +1,5 @@
 #include "interpolator_rife.h"
 
-#include <cstdio>
 #include <filesystem>
 
 #include <libavutil/pixdesc.h>
@@ -115,7 +114,6 @@ int InterpolatorRIFE::interpolate(
         logger()->error("Failed to convert AVFrame to ncnn::Mat");
         return -1;
     }
-
     ncnn::Mat in_mat2 = conversions::avframe_to_ncnn_mat(in_frame, &color_hint);
     if (in_mat2.empty()) {
         logger()->error("Failed to convert AVFrame to ncnn::Mat");
