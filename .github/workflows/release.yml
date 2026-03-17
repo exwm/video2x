@@ -106,7 +106,7 @@ jobs:
         run: just setup-deps-appimage
 
       - name: Build AppImage
-        run: just appimage
+        run: just build-appimage
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6

@@ -13,8 +13,21 @@ ncnn_version := "20241226"
 # Default build type for build recipes (can be overridden with build_type=Debug)
 build_type := "Release"
 
-# Whether to prune old RIFE model directories in appimage builds
+# Whether to prune old RIFE model directories from builds
 prune_rife_models := "true"
+
+# Space-separated list of old RIFE model names to remove when pruning
+rife_models_prune_list := "rife rife-HD rife-UHD rife-anime rife-v2 rife-v2.3 rife-v2.4 rife-v3.0 rife-v3.1"
+
+# Per-build-type paths to the rife models directory within the install output
+rife_models_dir_unix     := bindir / "video2x-install/share/video2x/models/rife"
+rife_models_dir_windows  := bindir / "video2x-install/models/rife"
+rife_models_dir_ubuntu   := "build/video2x-linux-ubuntu-amd64/usr/share/video2x/models/rife"
+rife_models_dir_appimage := "AppDir/usr/share/video2x/models/rife"
+
+# Active rife models directory passed to prune-rife-models (set by each build recipe)
+rife_models_dir := ""
+
 
 # Test video and output paths
 test_video := "data/standard-test.mp4"
@@ -30,6 +43,7 @@ build:
         -DCMAKE_INSTALL_PREFIX={{bindir}}/video2x-install \
         -DVIDEO2X_ENABLE_NATIVE=ON
     cmake --build {{bindir}} --config {{build_type}} --parallel --target install
+    [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_unix}} prune-rife-models || true
 
 [windows]
 [group('build')]
@@ -46,6 +60,7 @@ build:
         -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
         -DVIDEO2X_USE_EXTERNAL_BOOST=OFF
     cmake --build {{bindir}} --config {{build_type}} --parallel --target install
+    if ("{{prune_rife_models}}" -eq "true") { just rife_models_dir={{rife_models_dir_windows}} prune-rife-models }
 
 [unix]
 [group('build')]
@@ -230,6 +245,7 @@ build-ubuntu2404-deb:
         -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-amd64/usr
     cmake --build build --config {{build_type}} --target install --parallel
+    [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_ubuntu}} prune-rife-models || true
     mkdir -p build/video2x-linux-ubuntu-amd64/DEBIAN
     cp packaging/debian/control.ubuntu2404 build/video2x-linux-ubuntu-amd64/DEBIAN/control
     dpkg-deb --build build/video2x-linux-ubuntu-amd64
@@ -245,6 +261,7 @@ build-ubuntu2204-deb:
         -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-amd64/usr
     cmake --build build --config {{build_type}} --target install --parallel
+    [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_ubuntu}} prune-rife-models || true
     mkdir -p build/video2x-linux-ubuntu-amd64/DEBIAN
     cp packaging/debian/control.ubuntu2204 build/video2x-linux-ubuntu-amd64/DEBIAN/control
     dpkg-deb --build build/video2x-linux-ubuntu-amd64
@@ -275,17 +292,40 @@ appimage:
         -DNCNN_AVX512=OFF \
         -DCMAKE_INSTALL_PREFIX=AppDir/usr
     cmake --build build --config {{build_type}} --target install --parallel
-    if [ "{{prune_rife_models}}" = "true" ]; then \
-        rm -rf AppDir/usr/share/video2x/models/rife/rife \
-            AppDir/usr/share/video2x/models/rife/rife-HD \
-            AppDir/usr/share/video2x/models/rife/rife-UHD \
-            AppDir/usr/share/video2x/models/rife/rife-anime \
-            AppDir/usr/share/video2x/models/rife/rife-v2 \
-            AppDir/usr/share/video2x/models/rife/rife-v2.3 \
-            AppDir/usr/share/video2x/models/rife/rife-v2.4 \
-            AppDir/usr/share/video2x/models/rife/rife-v3.0 \
-            AppDir/usr/share/video2x/models/rife/rife-v3.1; \
-    fi
+    [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_appimage}} prune-rife-models || true
+    curl -Lo /usr/local/bin/linuxdeploy \
+        https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+    chmod +x /usr/local/bin/linuxdeploy
+    LD_LIBRARY_PATH=AppDir/usr/lib linuxdeploy \
+        --appdir AppDir \
+        --executable AppDir/usr/bin/video2x \
+        --exclude-library "libvulkan.so.1" \
+        --desktop-file packaging/appimage/video2x.desktop \
+        --icon-file packaging/appimage/video2x.png \
+        --output appimage
+
+[unix]
+[group('build')]
+prune-rife-models:
+    for model in {{rife_models_prune_list}}; do rm -rf "{{rife_models_dir}}/$model"; done
+
+[windows]
+[group('build')]
+prune-rife-models:
+    foreach ($model in "{{rife_models_prune_list}}".Split()) { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "{{rife_models_dir}}\$model" }
+
+[unix]
+[group('build')]
+build-appimage:
+    cmake -G '{{generator}}' -B build -S . \
+        -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
+        -DNCNN_BUILD_SHARED_LIBS=ON \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
+        -DNCNN_AVX512=OFF \
+        -DCMAKE_INSTALL_PREFIX=AppDir/usr
+    cmake --build build --config {{build_type}} --target install --parallel
+    [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_appimage}} prune-rife-models || true
     curl -Lo /usr/local/bin/linuxdeploy \
         https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
     chmod +x /usr/local/bin/linuxdeploy
@@ -333,7 +373,7 @@ test-libplacebo:
 test-rife:
     LD_LIBRARY_PATH={{bindir}} {{bindir}}/video2x \
         -i {{test_video}} -o {{test_output}} \
-        -p rife -m 4 --rife-model rife-v4.6
+        -p rife -m 4 --rife-model rife-v4.26
 
 [unix]
 [group('test')]
@@ -392,7 +432,7 @@ memcheck-rife:
         --verbose --log-file="valgrind.log" \
         {{bindir}}/video2x \
         -i {{test_video}} -o {{test_output}} \
-        -p rife -m 4 --rife-model rife-v4.6 \
+        -p rife -m 4 --rife-model rife-v4.26 \
         -e preset=veryfast -e crf=30
 
 [unix]
@@ -428,5 +468,5 @@ heaptrack-rife:
     LD_LIBRARY_PATH={{bindir}} HEAPTRACK_ENABLE_DEBUGINFOD=1 heaptrack \
         {{bindir}}/video2x \
         -i {{test_video}} -o {{test_output}} \
-        -p rife -m 4 --rife-model rife-v4.6 \
+        -p rife -m 4 --rife-model rife-v4.26 \
         -e preset=veryfast -e crf=30

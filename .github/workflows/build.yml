@@ -37,7 +37,7 @@ jobs:
         run: just setup-deps-ubuntu
 
       - name: Build Video2X
-        run: just build build_type=Debug
+        run: just build_type=Debug build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -71,7 +71,7 @@ jobs:
 
       - name: Build Video2X
         shell: pwsh
-        run: just build build_type=Debug
+        run: just build_type=Debug build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -107,7 +107,7 @@ jobs:
         run: just setup-deps-appimage
 
       - name: Build AppImage
-        run: just appimage prune_rife_models=false
+        run: just prune_rife_models=false build-appimage
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
