@@ -20,8 +20,6 @@ jobs:
         run: echo version=${GITHUB_REF/refs\/tags\//} >> $GITHUB_OUTPUT
 
   ubuntu-2404:
-    # GitHub Actions' ubuntu-24.04 runner does not have enough RAM
-    if: false
     name: Build Ubuntu 24.04 release
     needs:
       - setup
@@ -34,41 +32,22 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install just
+        uses: extractions/setup-just@v3
+
       - name: Install dependencies
-        run: |
-          git submodule update --init --recursive
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-              libavcodec-dev \
-              libavdevice-dev \
-              libavfilter-dev \
-              libavformat-dev \
-              libavutil-dev \
-              libswscale-dev \
-              libvulkan-dev \
-              glslang-tools \
-              libomp-dev \
-              libboost-program-options-dev
+        run: just setup-deps-ubuntu
 
       - name: Build Video2X
-        run: |
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
-            -DVIDEO2X_USE_EXTERNAL_NCNN=OFF -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
-            -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-2404-amd64/usr
-          cmake --build build --config Release --target install --parallel
-          mkdir -p build/video2x-linux-ubuntu-2404-amd64/DEBIAN
-          cp packaging/debian/control build/video2x-linux-ubuntu-2404-amd64/DEBIAN/control
-          dpkg-deb --build build/video2x-linux-ubuntu-2404-amd64
+        run: just build-ubuntu2404-deb
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           name: video2x-linux-ubuntu-2404-amd64
-          path: build/video2x-linux-ubuntu-2404-amd64.deb
+          path: build/video2x-linux-ubuntu-amd64.deb
 
   windows:
-    # Disabled because it takes too long to build
     name: Build Windows release
     needs:
       - setup
@@ -78,6 +57,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+
+      - name: Install just
+        uses: extractions/setup-just@v2
 
       - name: Install Vulkan SDK
         uses: humbletim/setup-vulkan-sdk@v1.2.1
@@ -89,30 +71,16 @@ jobs:
       - name: Install dependencies
         shell: pwsh
         run: |
-          $ffmpegVersion = "7.1"
-          $ncnnVersion = "20240820"
-
-          git submodule update --init --recursive
-
-          curl -Lo ffmpeg-shared.zip "https://github.com/GyanD/codexffmpeg/releases/download/$ffmpegVersion/ffmpeg-$ffmpegVersion-full_build-shared.zip"
-          Expand-Archive -Path ffmpeg-shared.zip -DestinationPath third_party
-          Rename-Item -Path "third_party/ffmpeg-$ffmpegVersion-full_build-shared" -NewName ffmpeg-shared
-
-          curl -Lo ncnn-shared.zip "https://github.com/Tencent/ncnn/releases/download/$ncnnVersion/ncnn-$ncnnVersion-windows-vs2022-shared.zip"
-          Expand-Archive -Path ncnn-shared.zip -DestinationPath third_party
-          Rename-Item -Path "third_party/ncnn-$ncnnVersion-windows-vs2022-shared" -NewName ncnn-shared
+          just setup-ffmpeg
+          just setup-ncnn
 
       - name: Build Video2X
         shell: pwsh
-        run: |
-          cmake -S . -B build `
-            -DVIDEO2X_USE_EXTERNAL_NCNN=OFF -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF -DVIDEO2X_USE_EXTERNAL_BOOST=OFF `
-            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=build/video2x_install
-          cmake --build build --config Release --parallel --target install
+        run: just build
 
       - name: Compress artifacts
-        run: |
-          Compress-Archive -Path build/video2x_install/* -DestinationPath build/video2x-windows-amd64.zip
+        shell: pwsh
+        run: Compress-Archive -Path build/video2x-install/* -DestinationPath build/video2x-windows-amd64.zip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -120,20 +88,65 @@ jobs:
           name: video2x-windows-amd64
           path: build/video2x-windows-amd64.zip
 
+  appimage:
+    name: Build AppImage release
+    needs:
+      - setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Install dependencies
+        run: just setup-deps-appimage
+
+      - name: Build AppImage
+        run: just appimage
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: Video2X-x86_64.AppImage
+          path: Video2X-x86_64.AppImage
+
+  container:
+    name: Build and upload container
+    # Disabled
+    if: false
+    needs:
+      - setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - uses: mr-smithers-excellent/docker-build-push@v6
+        name: Build & push the Docker image
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USER }}
+          password: ${{ secrets.GHCR_TOKEN }}
+          dockerfile: packaging/docker/Dockerfile
+          image: video2x
+          tags: latest, ${{ needs.setup.outputs.version }}
 
   create-release:
     name: Create release
     needs:
       - setup
-      # - ubuntu-2404
+      - ubuntu-2404
       - windows
+      - appimage
       # - container
     runs-on: ubuntu-latest
-    # outputs:
-      # upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
-      # - name: Download artifacts
-      #   uses: actions/download-artifact@v7
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
 
       - name: Create release
         id: create_release
@@ -144,3 +157,7 @@ jobs:
           name: ${{ needs.setup.outputs.version }}
           draft: true
           prerelease: false
+          files: |
+            video2x-linux-ubuntu-2404-amd64/video2x-linux-ubuntu-amd64.deb
+            video2x-windows-amd64/video2x-windows-amd64.zip
+            Video2X-x86_64.AppImage/Video2X-x86_64.AppImage

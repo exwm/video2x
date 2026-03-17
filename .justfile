@@ -6,6 +6,16 @@ bindir := "build"
 generator := "Ninja"
 cxx := "clang++"
 
+# Versions of Windows dependencies downloaded by setup-ffmpeg and setup-ncnn
+ffmpeg_version := "7.1"
+ncnn_version := "20241226"
+
+# Default build type for build recipes (can be overridden with build_type=Debug)
+build_type := "Release"
+
+# Whether to prune old RIFE model directories in appimage builds
+prune_rife_models := "true"
+
 # Test video and output paths
 test_video := "data/standard-test.mp4"
 test_output := "data/output.mp4"
@@ -16,17 +26,17 @@ build:
     cmake -G '{{generator}}' -S . -B {{bindir}} \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DCMAKE_CXX_COMPILER={{cxx}} \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX={{bindir}}/video2x-install \
         -DVIDEO2X_ENABLE_NATIVE=ON
-    cmake --build {{bindir}} --config Release --parallel --target install
+    cmake --build {{bindir}} --config {{build_type}} --parallel --target install
 
 [windows]
 [group('build')]
 build:
     cmake -S . -B {{bindir}} \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX={{bindir}}/video2x-install \
         -DCMAKE_INSTALL_BINDIR="." \
         -DCMAKE_INSTALL_LIBDIR="." \
@@ -35,7 +45,7 @@ build:
         -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
         -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
         -DVIDEO2X_USE_EXTERNAL_BOOST=OFF
-    cmake --build {{bindir}} --config Release --parallel --target install
+    cmake --build {{bindir}} --config {{build_type}} --parallel --target install
 
 [unix]
 [group('build')]
@@ -44,12 +54,12 @@ static:
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DCMAKE_CXX_COMPILER={{cxx}} \
         -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX={{bindir}}/video2x-install \
         -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
         -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
         -DVIDEO2X_USE_EXTERNAL_BOOST=OFF
-    cmake --build {{bindir}} --config Release --parallel --target install
+    cmake --build {{bindir}} --config {{build_type}} --parallel --target install
 
 [unix]
 [group('build')]
@@ -59,6 +69,58 @@ debug:
         -DCMAKE_CXX_COMPILER={{cxx}} \
         -DCMAKE_BUILD_TYPE=Debug
     cmake --build {{bindir}} --config Debug --parallel
+
+[unix]
+[group('build')]
+setup-deps-ubuntu:
+    sudo apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libavcodec-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libswscale-dev \
+        libvulkan-dev \
+        glslang-tools \
+        libomp-dev \
+        libboost-program-options-dev
+
+[unix]
+[group('build')]
+setup-deps-appimage:
+    sudo apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential cmake clang pkg-config ninja-build curl file fuse \
+        libavcodec-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libswscale-dev \
+        libvulkan-dev \
+        glslang-tools \
+        libomp-dev \
+        libboost-program-options1.83-dev \
+        libboost-program-options1.83.0 \
+        libspdlog-dev
+
+[windows]
+[group('build')]
+setup-ffmpeg:
+    curl -Lo ffmpeg-shared.zip "https://github.com/GyanD/codexffmpeg/releases/download/{{ffmpeg_version}}/ffmpeg-{{ffmpeg_version}}-full_build-shared.zip"
+    Expand-Archive -Path ffmpeg-shared.zip -DestinationPath third_party -Force
+    if (Test-Path "third_party/ffmpeg-shared") { Remove-Item -Recurse -Force "third_party/ffmpeg-shared" }
+    Rename-Item -Path "third_party/ffmpeg-{{ffmpeg_version}}-full_build-shared" -NewName ffmpeg-shared
+
+[windows]
+[group('build')]
+setup-ncnn:
+    curl -Lo ncnn-shared.zip "https://github.com/Tencent/ncnn/releases/download/{{ncnn_version}}/ncnn-{{ncnn_version}}-windows-vs2022-shared.zip"
+    Expand-Archive -Path ncnn-shared.zip -DestinationPath third_party -Force
+    if (Test-Path "third_party/ncnn-shared") { Remove-Item -Recurse -Force "third_party/ncnn-shared" }
+    Rename-Item -Path "third_party/ncnn-{{ncnn_version}}-windows-vs2022-shared" -NewName ncnn-shared
+    if (-not (Test-Path "third_party/ncnn-shared/x64/include/ncnn")) { New-Item -ItemType Directory -Path "third_party/ncnn-shared/x64/include/ncnn" | Out-Null; Move-Item -Path "third_party/ncnn-shared/x64/include/*.h" -Destination "third_party/ncnn-shared/x64/include/ncnn/" }
 
 [windows]
 [group('build')]
@@ -120,9 +182,9 @@ ubuntu2404:
         -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
         -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
         -DCMAKE_CXX_COMPILER=g++ \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX=video2x-linux-ubuntu-amd64/usr
-    cmake --build build --config Release --target install --parallel
+    cmake --build build --config {{build_type}} --target install --parallel
     mkdir -p video2x-linux-ubuntu-amd64/DEBIAN
     cp packaging/debian/control.ubuntu2404 video2x-linux-ubuntu-amd64/DEBIAN/control
     dpkg-deb --build video2x-linux-ubuntu-amd64
@@ -150,12 +212,42 @@ ubuntu2204:
         -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
         -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
         -DCMAKE_CXX_COMPILER=g++ \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX=video2x-linux-ubuntu-amd64/usr
-    cmake --build build --config Release --target install --parallel
+    cmake --build build --config {{build_type}} --target install --parallel
     mkdir -p video2x-linux-ubuntu-amd64/DEBIAN
     cp packaging/debian/control.ubuntu2204 video2x-linux-ubuntu-amd64/DEBIAN/control
     dpkg-deb --build video2x-linux-ubuntu-amd64
+
+[unix]
+[group('build')]
+build-ubuntu2404-deb:
+    cmake -G '{{generator}}' -B build -S . \
+        -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
+        -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
+        -DCMAKE_C_COMPILER=gcc \
+        -DCMAKE_CXX_COMPILER=g++ \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
+        -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-amd64/usr
+    cmake --build build --config {{build_type}} --target install --parallel
+    mkdir -p build/video2x-linux-ubuntu-amd64/DEBIAN
+    cp packaging/debian/control.ubuntu2404 build/video2x-linux-ubuntu-amd64/DEBIAN/control
+    dpkg-deb --build build/video2x-linux-ubuntu-amd64
+
+[unix]
+[group('build')]
+build-ubuntu2204-deb:
+    cmake -G '{{generator}}' -B build -S . \
+        -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
+        -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
+        -DCMAKE_C_COMPILER=gcc \
+        -DCMAKE_CXX_COMPILER=g++ \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
+        -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-amd64/usr
+    cmake --build build --config {{build_type}} --target install --parallel
+    mkdir -p build/video2x-linux-ubuntu-amd64/DEBIAN
+    cp packaging/debian/control.ubuntu2204 build/video2x-linux-ubuntu-amd64/DEBIAN/control
+    dpkg-deb --build build/video2x-linux-ubuntu-amd64
 
 [unix]
 [group('build')]
@@ -179,19 +271,21 @@ appimage:
         -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
         -DNCNN_BUILD_SHARED_LIBS=ON \
         -DCMAKE_CXX_COMPILER=clang++ \
-        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_BUILD_TYPE={{build_type}} \
         -DNCNN_AVX512=OFF \
         -DCMAKE_INSTALL_PREFIX=AppDir/usr
-    cmake --build build --config Release --target install --parallel
-    rm -rf AppDir/usr/share/video2x/models/rife/rife \
-        AppDir/usr/share/video2x/models/rife/rife-HD \
-        AppDir/usr/share/video2x/models/rife/rife-UHD \
-        AppDir/usr/share/video2x/models/rife/rife-anime \
-        AppDir/usr/share/video2x/models/rife/rife-v2 \
-        AppDir/usr/share/video2x/models/rife/rife-v2.3 \
-        AppDir/usr/share/video2x/models/rife/rife-v2.4 \
-        AppDir/usr/share/video2x/models/rife/rife-v3.0 \
-        AppDir/usr/share/video2x/models/rife/rife-v3.1
+    cmake --build build --config {{build_type}} --target install --parallel
+    if [ "{{prune_rife_models}}" = "true" ]; then \
+        rm -rf AppDir/usr/share/video2x/models/rife/rife \
+            AppDir/usr/share/video2x/models/rife/rife-HD \
+            AppDir/usr/share/video2x/models/rife/rife-UHD \
+            AppDir/usr/share/video2x/models/rife/rife-anime \
+            AppDir/usr/share/video2x/models/rife/rife-v2 \
+            AppDir/usr/share/video2x/models/rife/rife-v2.3 \
+            AppDir/usr/share/video2x/models/rife/rife-v2.4 \
+            AppDir/usr/share/video2x/models/rife/rife-v3.0 \
+            AppDir/usr/share/video2x/models/rife/rife-v3.1; \
+    fi
     curl -Lo /usr/local/bin/linuxdeploy \
         https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
     chmod +x /usr/local/bin/linuxdeploy
