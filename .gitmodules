@@ -16,3 +16,6 @@
 [submodule "third_party/librife_ncnn_vulkan"]
 	path = third_party/librife_ncnn_vulkan
 	url = https://github.com/k4yt3x/librife-ncnn-vulkan.git
+[submodule "third_party/SPAN-ncnn-vulkan"]
+	path = third_party/SPAN-ncnn-vulkan
+	url = https://github.com/TNTwise/SPAN-ncnn-vulkan

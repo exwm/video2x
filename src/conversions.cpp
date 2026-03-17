@@ -15,11 +15,14 @@ extern "C" {
 namespace video2x {
 namespace conversions {
 
-// Resampling filter used for all pixel format conversions. SWS_BICUBIC is
-// sharper than bilinear while avoiding the ringing/shimmer of Lanczos/Sinc.
-// Both conversion directions use the same filter so
-// the round-trip is symmetric and does not introduce asymmetric chroma error.
-static constexpr int SWS_FILTER = SWS_BICUBIC;
+// swscale filter flags used for all pixel format conversions that better match ffmpeg defaults.
+// SWS_BICUBIC: high-quality resampling.
+// SWS_ACCURATE_RND: use accurate rounding.
+// SWS_FULL_CHR_H_INT: use full chroma interpolation height so each output row gets its
+//   own interpolated chroma value rather than reusing the nearest chroma row.
+static constexpr int SWS_FILTER = SWS_BICUBIC | SWS_ACCURATE_RND | SWS_FULL_CHR_H_INT;
+// Pixel format used for the intermediate ncnn::Mat passed to and from the inference models.
+static constexpr AVPixelFormat NCNN_MAT_PIX_FMT = AV_PIX_FMT_BGR24;
 
 // Map an AVColorSpace enum to the SWS_CS_* constant expected by sws_setColorspaceDetails.
 // sws_getContext always defaults to BT.601; call sws_setColorspaceDetails after to override.
@@ -191,8 +194,8 @@ ncnn::Mat avframe_to_ncnn_mat(AVFrame* frame, const AVFrame* color_hint) {
     AVFrame* converted_frame = nullptr;
 
     // Convert to BGR24 format if necessary
-    if (frame->format != AV_PIX_FMT_BGR24) {
-        converted_frame = convert_avframe_pix_fmt(frame, AV_PIX_FMT_BGR24);
+    if (frame->format != NCNN_MAT_PIX_FMT) {
+        converted_frame = convert_avframe_pix_fmt(frame, NCNN_MAT_PIX_FMT);
         if (!converted_frame) {
             logger()->error("Failed to convert AVFrame to BGR24.");
             return ncnn::Mat();
@@ -257,7 +260,7 @@ ncnn_mat_to_avframe(const ncnn::Mat& mat, AVPixelFormat pix_fmt, const AVFrame* 
         return nullptr;
     }
 
-    bgr_frame->format = AV_PIX_FMT_BGR24;
+    bgr_frame->format = NCNN_MAT_PIX_FMT;
     bgr_frame->width = mat.w;
     bgr_frame->height = mat.h;
 
@@ -282,7 +285,7 @@ ncnn_mat_to_avframe(const ncnn::Mat& mat, AVPixelFormat pix_fmt, const AVFrame* 
     SwsContext* sws_ctx = sws_getContext(
         bgr_frame->width,
         bgr_frame->height,
-        AV_PIX_FMT_BGR24,
+        NCNN_MAT_PIX_FMT,
         dst_frame->width,
         dst_frame->height,
         pix_fmt,
