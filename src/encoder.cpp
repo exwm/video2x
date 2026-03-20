@@ -183,17 +183,30 @@ int Encoder::init(
     }
 
     // Set extra AVOptions
+    // Options are tried in order: codec private, codec context, then deferred to the muxer.
+    AVDictionary* muxer_opts = nullptr;
     for (const auto& [opt_name, opt_value] : enc_cfg.extra_opts) {
-        std::string opt_name_str = opt_name;
-        std::string opt_value_str = opt_value;
-        logger()->debug("Setting encoder option '{}' to '{}'", opt_name_str, opt_value_str);
+        logger()->debug("Setting encoder option '{}' to '{}'", opt_name, opt_value);
 
-        ret = av_opt_set(enc_ctx_->priv_data, opt_name_str.c_str(), opt_value_str.c_str(), 0);
+        // Try codec private options first (e.g. libx264-specific options)
+        ret = av_opt_set(enc_ctx_->priv_data, opt_name.c_str(), opt_value.c_str(), 0);
+
+        // Fall back to AVCodecContext-level options (e.g. 'bf', thread options)
+        if (ret == AVERROR_OPTION_NOT_FOUND) {
+            ret = av_opt_set(enc_ctx_, opt_name.c_str(), opt_value.c_str(), AV_OPT_SEARCH_CHILDREN);
+        }
+
+        // Defer to muxer if not found in codec context (e.g. 'movflags', 'video_track_timescale')
+        if (ret == AVERROR_OPTION_NOT_FOUND) {
+            av_dict_set(&muxer_opts, opt_name.c_str(), opt_value.c_str(), 0);
+            ret = 0;
+        }
+
         if (ret < 0) {
             char errbuf[AV_ERROR_MAX_STRING_SIZE];
             av_strerror(ret, errbuf, sizeof(errbuf));
             logger()->warn(
-                "Failed to set encoder option '{}' to '{}': {}", opt_name_str, opt_value_str, errbuf
+                "Failed to set encoder option '{}' to '{}': {}", opt_name, opt_value, errbuf
             );
         }
     }
@@ -306,8 +319,9 @@ int Encoder::init(
         }
     }
 
-    // Write the output file header
-    ret = avformat_write_header(ofmt_ctx_, nullptr);
+    // Write the output file header, passing any deferred muxer options
+    ret = avformat_write_header(ofmt_ctx_, &muxer_opts);
+    av_dict_free(&muxer_opts);
     if (ret < 0) {
         logger()->error("Error writing output file header");
         return ret;
