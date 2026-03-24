@@ -14,10 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      version_suffix: ${{ steps.get_version.outputs.version_suffix }}
     steps:
       - name: Get version
         id: get_version
-        run: echo version=${GITHUB_REF/refs\/tags\//} >> $GITHUB_OUTPUT
+        run: |
+          version=${GITHUB_REF#refs/tags/}
+          suffix=${version#*-}
+          [ "$suffix" = "$version" ] && suffix=""
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version_suffix=$suffix" >> $GITHUB_OUTPUT
 
   ubuntu-2404:
     name: Build Ubuntu 24.04 release
@@ -39,7 +45,7 @@ jobs:
         run: just setup-deps-ubuntu
 
       - name: Build Video2X
-        run: just build-ubuntu2404-deb
+        run: just version_suffix=${{ needs.setup.outputs.version_suffix }} build-ubuntu2404-deb
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -76,7 +82,7 @@ jobs:
 
       - name: Build Video2X
         shell: pwsh
-        run: just build
+        run: just version_suffix=${{ needs.setup.outputs.version_suffix }} build
 
       - name: Compress artifacts
         shell: pwsh
@@ -106,7 +112,7 @@ jobs:
         run: just setup-deps-appimage
 
       - name: Build AppImage
-        run: just build-appimage
+        run: just version_suffix=${{ needs.setup.outputs.version_suffix }} build-appimage
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
