@@ -21,6 +21,7 @@ struct EncoderConfig {
     bool vfr = false;
     bool copy_audio_streams = true;
     bool copy_subtitle_streams = true;
+    bool preserve_metadata = false;
 
     // Basic video options
     AVPixelFormat pix_fmt = AV_PIX_FMT_NONE;

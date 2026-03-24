@@ -98,6 +98,8 @@ int parse_args(
             ("no-recalculate-pts", "Do not recalculate presentation timestamps")
             ("no-copy-audio-streams", "Do not copy audio streams")
             ("no-copy-subtitle-streams", "Do not copy subtitle streams")
+            ("preserve-metadata", po::bool_switch(&enc_cfg.preserve_metadata),
+                "Copy metadata from the input file to the output file")
             ("pix-fmt", PO_STR_VALUE<video2x::fsutils::StringType>(), "Output pixel format")
             ("bit-rate", po::value<int64_t>(&enc_cfg.bit_rate)->default_value(0),
                 "Bitrate in bits per second")

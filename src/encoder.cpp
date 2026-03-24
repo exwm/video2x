@@ -85,6 +85,11 @@ int Encoder::init(
         return AVERROR_UNKNOWN;
     }
 
+    // Copy format-level metadata from input to output
+    if (enc_cfg.preserve_metadata) {
+        av_dict_copy(&ofmt_ctx_->metadata, ifmt_ctx->metadata, 0);
+    }
+
     // Find the encoder
     const AVCodec* encoder = avcodec_find_encoder_by_name(enc_cfg.codec.c_str());
     if (!encoder) {
@@ -99,6 +104,11 @@ int Encoder::init(
         return AVERROR_UNKNOWN;
     }
     out_vstream_idx_ = out_vstream->index;
+
+    // Copy video stream metadata from input to output
+    if (enc_cfg.preserve_metadata) {
+        av_dict_copy(&out_vstream->metadata, ifmt_ctx->streams[in_vstream_idx]->metadata, 0);
+    }
 
     // Allocate the encoder context
     enc_ctx_ = avcodec_alloc_context3(encoder);
