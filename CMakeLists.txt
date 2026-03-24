@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(video2x VERSION 6.5.0 LANGUAGES CXX)
 
+# Optional version suffix appended to the display version with a hyphen (e.g., "beta" -> "6.5.0-beta")
+set(VIDEO2X_VERSION_SUFFIX "" CACHE STRING "Optional suffix appended to the display version string")
+
+if(VIDEO2X_VERSION_SUFFIX STREQUAL "")
+    set(LIBVIDEO2X_VERSION_DISPLAY_STRING "${PROJECT_VERSION}")
+else()
+    set(LIBVIDEO2X_VERSION_DISPLAY_STRING "${PROJECT_VERSION}-${VIDEO2X_VERSION_SUFFIX}")
+endif()
+
 include(CMakePackageConfigHelpers)
 include(ExternalProject)
 include(GNUInstallDirs)

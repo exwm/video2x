@@ -145,7 +145,10 @@ int parse_args(
         interp_opts.add_options()
             ("frame-rate-mul,m", po::value<int>(&proc_cfg.frm_rate_mul)
                 ->notifier([](int v) { validate_min(v, "frame-rate-mul", 2); }),
-                "Frame rate multiplier")
+                "Frame rate multiplier for interpolation (must be >= 2); "
+                "for slow-motion clips, multiply your desired output multiplier by the clip's "
+                "playback speed to get the effective frame rate ratio "
+                "(e.g., 2x interpolation on a 0.6x-speed clip produces 1.2x the source frame rate)")
             ("scene-thresh,t", po::value<float>(&proc_cfg.scn_det_thresh)->default_value(100.0f)
                 ->notifier([](float v) { validate_range<float>(v, "scene-thresh", 0.0, 100.0); }),
                 "Scene detection threshold (20 means 20% diff between frames is a scene change)")
@@ -239,7 +242,7 @@ int parse_args(
         }
 
         if (vm.count("version")) {
-            std::cout << "Video2X version " << LIBVIDEO2X_VERSION_STRING << std::endl;
+            std::cout << "Video2X version " << LIBVIDEO2X_VERSION_DISPLAY_STRING << std::endl;
             return 1;
         }
 
@@ -288,7 +291,7 @@ int parse_args(
         video2x::logger_manager::LoggerManager::instance().hook_ffmpeg_logging();
 
         // Print program banner
-        video2x::logger()->info("Video2X version {}", LIBVIDEO2X_VERSION_STRING);
+        video2x::logger()->info("Video2X version {}", LIBVIDEO2X_VERSION_DISPLAY_STRING);
         // video2x::logger()->info("Copyright (C) 2018-2024 K4YT3X and contributors.");
         // video2x::logger()->info("Licensed under GNU AGPL version 3.");
 

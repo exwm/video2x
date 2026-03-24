@@ -13,6 +13,9 @@ ncnn_version := "20241226"
 # Default build type for build recipes (can be overridden with build_type=Debug)
 build_type := "Release"
 
+# Optional version suffix appended to the display version with a hyphen (e.g., version_suffix=beta -> "6.5.0-beta")
+version_suffix := ""
+
 # Whether to prune old RIFE model directories from builds
 prune_rife_models := "true"
 
@@ -41,7 +44,8 @@ build:
         -DCMAKE_CXX_COMPILER={{cxx}} \
         -DCMAKE_BUILD_TYPE={{build_type}} \
         -DCMAKE_INSTALL_PREFIX={{bindir}}/video2x-install \
-        -DVIDEO2X_ENABLE_NATIVE=ON
+        -DVIDEO2X_ENABLE_NATIVE=ON \
+        -DVIDEO2X_VERSION_SUFFIX={{version_suffix}}
     cmake --build {{bindir}} --config {{build_type}} --parallel --target install
     [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_unix}} prune-rife-models || true
 
@@ -58,7 +62,8 @@ build:
         -DCMAKE_INSTALL_DATADIR="." \
         -DVIDEO2X_USE_EXTERNAL_NCNN=OFF \
         -DVIDEO2X_USE_EXTERNAL_SPDLOG=OFF \
-        -DVIDEO2X_USE_EXTERNAL_BOOST=OFF
+        -DVIDEO2X_USE_EXTERNAL_BOOST=OFF \
+        -DVIDEO2X_VERSION_SUFFIX={{version_suffix}}
     cmake --build {{bindir}} --config {{build_type}} --parallel --target install
     if ("{{prune_rife_models}}" -eq "true") { just rife_models_dir={{rife_models_dir_windows}} prune-rife-models }
 
@@ -243,7 +248,8 @@ build-ubuntu2404-deb:
         -DCMAKE_C_COMPILER=gcc \
         -DCMAKE_CXX_COMPILER=g++ \
         -DCMAKE_BUILD_TYPE={{build_type}} \
-        -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-amd64/usr
+        -DCMAKE_INSTALL_PREFIX=build/video2x-linux-ubuntu-amd64/usr \
+        -DVIDEO2X_VERSION_SUFFIX={{version_suffix}}
     cmake --build build --config {{build_type}} --target install --parallel
     [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_ubuntu}} prune-rife-models || true
     mkdir -p build/video2x-linux-ubuntu-amd64/DEBIAN
@@ -323,7 +329,8 @@ build-appimage:
         -DCMAKE_CXX_COMPILER=clang++ \
         -DCMAKE_BUILD_TYPE={{build_type}} \
         -DNCNN_AVX512=OFF \
-        -DCMAKE_INSTALL_PREFIX=AppDir/usr
+        -DCMAKE_INSTALL_PREFIX=AppDir/usr \
+        -DVIDEO2X_VERSION_SUFFIX={{version_suffix}}
     cmake --build build --config {{build_type}} --target install --parallel
     [ "{{prune_rife_models}}" = "true" ] && just rife_models_dir={{rife_models_dir_appimage}} prune-rife-models || true
     curl -Lo /usr/local/bin/linuxdeploy \
