@@ -7,7 +7,7 @@ generator := "Ninja"
 cxx := "clang++"
 
 # Versions of Windows dependencies downloaded by setup-ffmpeg and setup-ncnn
-ffmpeg_version := "7.1"
+ffmpeg_version := "8.1"
 ncnn_version := "20241226"
 
 # Default build type for build recipes (can be overridden with build_type=Debug)
