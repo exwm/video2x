@@ -33,10 +33,23 @@ Encoder::~Encoder() {
     }
 }
 
-void Encoder::configure_vfr_time_base(int frm_rate_mul, AVCodecContext* dec_ctx) {
-    // VFR modes never carry a fixed frame rate
-    enc_ctx_->framerate = {0, 1};
+// Encoders such as libsvtav1 reject an unset frame rate, deriving one from the fine VFR time base.
+// Min-fps mode emits a uniform timeline at vfr_fps, so that is its real rate. Proportional mode's
+// stream is marked variable, so its rate is a hint, capped at libsvtav1's 240 fps limit.
+static AVRational
+vfr_nominal_frame_rate(int frm_rate_mul, AVRational vfr_fps, AVRational in_frame_rate) {
+    if (frm_rate_mul == 0) {
+        return vfr_fps;
+    }
+    const AVRational max_hint = {240, 1};
+    AVRational hint = av_mul_q(in_frame_rate, {frm_rate_mul, 1});
+    if (hint.num <= 0 || hint.den <= 0 || av_cmp_q(hint, max_hint) > 0) {
+        return max_hint;
+    }
+    return hint;
+}
 
+void Encoder::configure_vfr_time_base(int frm_rate_mul, AVCodecContext* dec_ctx) {
     if (frm_rate_mul > 0) {
         // Proportional mode: use a finer time base so interpolated positions within
         // each input gap can be represented exactly.
@@ -53,7 +66,7 @@ void Encoder::configure_vfr_time_base(int frm_rate_mul, AVCodecContext* dec_ctx)
             enc_ctx_->time_base = {1, 90000 * frm_rate_mul};
         }
     } else {
-        // Min-fps mode: output frame rate is variable; use input time base directly.
+        // Min-fps mode: frames land on input timestamps, so keep the input time base.
         if (dec_ctx->time_base.num > 0 && dec_ctx->time_base.den > 0) {
             enc_ctx_->time_base = dec_ctx->time_base;
         } else {
@@ -172,6 +185,9 @@ int Encoder::init(
 
     if (enc_cfg.vfr) {
         configure_vfr_time_base(frm_rate_mul, dec_ctx);
+        enc_ctx_->framerate = vfr_nominal_frame_rate(
+            frm_rate_mul, enc_cfg.vfr_fps, avutils::get_video_frame_rate(ifmt_ctx, in_vstream_idx)
+        );
     } else if (frm_rate_mul > 0) {
         // CFR: existing behavior, unchanged
         AVRational in_frame_rate = avutils::get_video_frame_rate(ifmt_ctx, in_vstream_idx);
@@ -244,6 +260,12 @@ int Encoder::init(
     out_vstream->time_base = enc_ctx_->time_base;
     out_vstream->avg_frame_rate = enc_ctx_->framerate;
     out_vstream->r_frame_rate = enc_ctx_->framerate;
+
+    // Proportional mode is genuinely VFR, so its nominal rate is only an encoder hint.
+    if (enc_cfg.vfr && frm_rate_mul > 0) {
+        out_vstream->avg_frame_rate = {0, 1};
+        out_vstream->r_frame_rate = {0, 1};
+    }
 
     // Copy other streams if necessary
     if (enc_cfg.copy_audio_streams || enc_cfg.copy_subtitle_streams) {

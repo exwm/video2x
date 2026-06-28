@@ -136,6 +136,7 @@ int VideoProcessor::process(
         }
         enc_cfg_.vfr = true;
         enc_cfg_.recalculate_pts = false;
+        enc_cfg_.vfr_fps = proc_cfg_.vfr_fps;
     }
 
     // Initialize the encoder

@@ -19,6 +19,8 @@ struct EncoderConfig {
     std::string codec = "libx264";
     bool recalculate_pts = true;
     bool vfr = false;
+    // Min-fps mode's output rate; {0, 1} in other modes.
+    AVRational vfr_fps = {0, 1};
     bool copy_audio_streams = true;
     bool copy_subtitle_streams = true;
     bool preserve_metadata = false;
