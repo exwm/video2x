@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
-project(video2x VERSION 6.5.0 LANGUAGES CXX)
+project(video2x VERSION 6.5.1 LANGUAGES CXX)
 
 # Optional version suffix appended to the display version with a hyphen (e.g., "beta" -> "6.5.0-beta")
 set(VIDEO2X_VERSION_SUFFIX "" CACHE STRING "Optional suffix appended to the display version string")
