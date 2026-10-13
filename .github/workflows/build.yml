@@ -46,7 +46,8 @@ jobs:
           path: build/video2x-install
 
   windows:
-    runs-on: windows-latest
+    # Matches the release workflow's toolset
+    runs-on: windows-2022
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
