@@ -13,8 +13,9 @@ pkgver() {
 }
 
 prepare() {
-    git rm ../third_party/{ncnn,spdlog,boost}
-    git submodule update --init --recursive
+    # Arch packages ncnn, spdlog, and boost, so only the filter libraries are needed
+    git -C .. submodule update --init --depth 1 third_party/librealesrgan_ncnn_vulkan \
+        third_party/librealcugan_ncnn_vulkan third_party/librife_ncnn_vulkan
 }
 
 build() {

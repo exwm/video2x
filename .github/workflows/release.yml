@@ -35,14 +35,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Install just
         uses: extractions/setup-just@v3
 
       - name: Install dependencies
-        run: just setup-deps-ubuntu
+        run: |
+          just setup-submodules
+          just setup-deps-ubuntu
 
       - name: Build Video2X
         run: just version_suffix=${{ needs.setup.outputs.version_suffix }} build-ubuntu2404-deb
@@ -62,22 +62,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Install just
         uses: extractions/setup-just@v2
 
+      # LunarG's prebuilt SDK, instead of building the loader and glslang from source
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
         with:
-          vulkan-query-version: 1.4.304.1
-          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang, SPIRV-Tools, SPIRV-Headers
-          vulkan-use-cache: true
+          vulkan_version: 1.4.304.1
+          cache: true
 
       - name: Install dependencies
         shell: pwsh
         run: |
+          just setup-submodules
+          just setup-boost
           just setup-ffmpeg
           just setup-ncnn
 
@@ -87,7 +87,7 @@ jobs:
 
       - name: Compress artifacts
         shell: pwsh
-        run: Compress-Archive -Path build/video2x-install/* -DestinationPath build/video2x-windows-amd64.zip
+        run: 7z a -tzip build/video2x-windows-amd64.zip ./build/video2x-install/*
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
@@ -103,14 +103,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Install just
         uses: extractions/setup-just@v2
 
       - name: Install dependencies
-        run: just setup-deps-appimage
+        run: |
+          just setup-submodules
+          just setup-deps-appimage
 
       - name: Build AppImage
         run: just version_suffix=${{ needs.setup.outputs.version_suffix }} build-appimage

@@ -6,9 +6,10 @@ bindir := "build"
 generator := "Ninja"
 cxx := "clang++"
 
-# Versions of Windows dependencies downloaded by setup-ffmpeg and setup-ncnn
+# Versions of Windows dependencies downloaded by setup-ffmpeg, setup-ncnn, and setup-boost
 ffmpeg_version := "8.0.1"
 ncnn_version := "20241226"
+boost_version := "1.86.0"
 
 # Default build type for build recipes (can be overridden with build_type=Debug)
 build_type := "Release"
@@ -132,6 +133,31 @@ setup-ffmpeg:
     Expand-Archive -Path ffmpeg-shared.zip -DestinationPath third_party -Force
     if (Test-Path "third_party/ffmpeg-shared") { Remove-Item -Recurse -Force "third_party/ffmpeg-shared" }
     Rename-Item -Path "third_party/ffmpeg-{{ffmpeg_version}}-full_build-shared" -NewName ffmpeg-shared
+
+# Boost's release archive of the version the third_party/boost submodule pins. One download is
+# much faster than cloning its ~170 nested submodules. Skipped when the submodule is checked out.
+[windows]
+[group('build')]
+setup-boost:
+    if (-not (Test-Path "third_party/boost/CMakeLists.txt")) { \
+        curl -Lo boost.7z "https://github.com/boostorg/boost/releases/download/boost-{{boost_version}}/boost-{{boost_version}}-cmake.7z"; \
+        7z x boost.7z -othird_party -y | Out-Null; \
+        if (Test-Path "third_party/boost") { Remove-Item -Recurse -Force "third_party/boost" }; \
+        Rename-Item -Path "third_party/boost-{{boost_version}}" -NewName boost \
+    }
+
+# The submodules each platform's build uses, fetched shallow and in parallel. Linux builds ncnn
+# from source and uses the system Boost; Windows uses the prebuilt ncnn and setup-boost.
+[windows]
+[group('build')]
+setup-submodules:
+    git submodule update --init --depth 1 --jobs 8 third_party/spdlog third_party/librealesrgan_ncnn_vulkan third_party/librealcugan_ncnn_vulkan third_party/librife_ncnn_vulkan
+
+[unix]
+[group('build')]
+setup-submodules:
+    git submodule update --init --depth 1 --jobs 8 third_party/ncnn third_party/spdlog third_party/librealesrgan_ncnn_vulkan third_party/librealcugan_ncnn_vulkan third_party/librife_ncnn_vulkan
+    git -C third_party/ncnn submodule update --init --depth 1 glslang
 
 [windows]
 [group('build')]
