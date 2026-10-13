@@ -470,7 +470,7 @@ if(VIDEO2X_BUILD_CLI)
     else()
         option(Boost_USE_STATIC_LIBS "" ON)
         option(Boost_USE_STATIC_RUNTIME "" ON)
-        option(Boost_COMPONENTS program_options)
+        set(BOOST_INCLUDE_LIBRARIES program_options)
 
         add_subdirectory(third_party/boost)
         target_include_directories(video2x SYSTEM PRIVATE
