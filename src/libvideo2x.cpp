@@ -4,6 +4,7 @@ extern "C" {
 #include <libavutil/avutil.h>
 }
 
+#include <gpu.h>
 #include <spdlog/spdlog.h>
 
 #include "avutils.h"
@@ -702,6 +703,10 @@ int VideoProcessor::process_interpolation(
     // Clone because the decoder unrefs and overwrites frame on the next iteration.
     prev_frame.reset(av_frame_clone(frame));
     return ret;
+}
+
+void release_gpu_instance() {
+    ncnn::destroy_gpu_instance();
 }
 
 }  // namespace video2x

@@ -123,4 +123,9 @@ class LIBVIDEO2X_API VideoProcessor {
     std::atomic<int64_t> total_frames_ = 0;
 };
 
+// Releases ncnn's Vulkan instance. Call it once processing is done and before the program exits:
+// left to ncnn's static destructor, it runs after the Vulkan driver has unloaded and crashes the
+// process on Windows (0xC0000005) after a successful run.
+LIBVIDEO2X_API void release_gpu_instance();
+
 }  // namespace video2x

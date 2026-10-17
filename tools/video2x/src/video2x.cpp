@@ -71,9 +71,10 @@ int main(int argc, char** argv) {
     // Parse command line arguments
     int parse_ret = parse_args(argc, argv, arguments, proc_cfg, enc_cfg);
 
-    // Return if parsing failed
+    // Exit codes: 0 success, 1 processing failed, 2 aborted, 3 invalid arguments. A negative
+    // code would reach the caller as 255 on Unix and 4294967295 on Windows.
     if (parse_ret < 0) {
-        return parse_ret;
+        return 3;
     }
 
     // Return if help message or version info was displayed
@@ -214,6 +215,10 @@ int main(int argc, char** argv) {
 
     // Join the processing thread to ensure it completes before exiting
     processing_thread.join();
+
+    // The processors are gone once processing returns, so release the GPU now; ncnn's own
+    // cleanup at exit would crash after a successful run.
+    video2x::release_gpu_instance();
 
     // Print final message based on processing result
     if (video_processor.get_state() == video2x::VideoProcessorState::Aborted) {
