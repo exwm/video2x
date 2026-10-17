@@ -7,7 +7,7 @@ generator := "Ninja"
 cxx := "clang++"
 
 # Versions of Windows dependencies downloaded by setup-ffmpeg, setup-ncnn, and setup-boost
-ffmpeg_version := "8.0.1"
+ffmpeg_version := "9.0.2"
 ncnn_version := "20241226"
 boost_version := "1.86.0"
 
